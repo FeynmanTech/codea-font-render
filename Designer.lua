@@ -3,43 +3,155 @@
 -- Font Designer
 
 -- Use this function to perform your initial setup
+
 function setup()
-    socket = require"socket"
+    fRaw = "Documents:FDATA_MODES"
+    fComp = "Documents:FDATA_COMPRESSED"
+    
     noSmooth()
-    scc = {}
+    socket = require"socket"
     fdata = {}
-    local i = readImage("Documents:RASTER_FONT")
-    if i then
-        local i2 = image(i.width*2,i.height*2)
-        print("Images made")
-        spriteMode(CORNER)
-        noSmooth()
-        setContext(i2)
-        sprite(i,0,0,i.width*2, i.height*2)
-        setContext()
-        print("Sprites made")
-        --local s = "--[["
-        for c = 1, i2.width*TYPES-fsize.w, fsize.w do
-            fdata[(c-1)/fsize.w] = {}
+    i = readImage(fRaw)
+    F_IM = readImage(fRaw)
+    ci = readImage(fComp)
+    print(io.open(os.getenv("HOME").."/Documents/FDATA_COMPRESSED.png", "r"))
+    i2 = image(i.width*2,i.height*2)
+    --print("Images made")
+    spriteMode(CORNER)
+    --noSmooth()
+    setContext(i2)
+    sprite(i,0,0,i.width*2, i.height*2)
+    setContext()
+    --print("Sprites made")
+    cc = 1
+    cm = i2.width*TYPES-fsize.w
+    tab={}
+    size=2
+    table.insert(tab,Rose(100+size*5,size))
+    c=0
+    speed = 1000
+    displayMode(FULLSCREEN)
+    FONTPIX = readImage("Documents:FDATA_COMPRESSED_TESTING")
+    SCROLL = 0
+    rectMode(CORNER)
+    conflicts = {}
+    --_ISCHECKING = true
+    loading = mesh()
+    loading.shader = shader("Documents:Loading")
+    loading.vertices = triangulate{
+    vec2(-298,-158),
+    vec2(-298, -136),
+    vec2(298, -136),
+    vec2(298, -158)
+    }
+    loading.texCoords = triangulate{vec2(0,0),vec2(0,1),vec2(1,1),vec2(1,0)}
+    loading.shader.texture = image(596,22)
+    setContext(loading.shader.texture)
+    background(255)
+    setContext()
+    loading:setColors(color(255))
+    --textMode(CORNER)
+    font("SourceSansPro-Regular")
+    fontSize(22)
+    startLoadingTime = socket.gettime()
+    --_ISCHECKING = true
+    --startRecording()
+end
+
+function draw()
+    --scale(.75)
+    smooth()
+    background(255)
+    stroke(255, 0, 0) strokeWidth(5) --noSmooth()
+    pushMatrix()
+    translate(WIDTH/2, HEIGHT/2)
+    for a,b in pairs(tab) do
+        b:draw()
+    end
+    --scale(2)
+    --popMatrix()
+    noSmooth()
+    --[[
+    noStroke()
+    fill(255,200)
+    rect(-120+cc/cm*240, -120, 240,240)
+    --]]
+    setContext(loading.shader.texture)
+    background(255)
+    stroke(0)
+    pushMatrix()
+    resetMatrix()
+    local ct = socket.gettime() - startLoadingTime
+    text(math.floor(cc/cm * 100) .. "% complete (" .. ("%.0f seconds remaining"):format((ct / cc)*(cm-cc)) .. ")", 596/2, 11)
+    popMatrix()
+    setContext()
+    strokeWidth(1)
+    stroke(0)
+    fill(255)
+    rect(-300,-160,600,26)
+    fill(0)
+    noStroke()
+    --rect(-198, -148, cc/cm * 396, 11)
+    loading.shader.completed = cc/cm
+    loading:draw()
+    popMatrix()
+    for cc = cc, math.min(cm, cc + fsize.w * speed), fsize.w do
+        if _ISCHECKING then
+            speed = 5
+            fdata[math.ceil(cc/fsize.w)] = fdata[math.ceil(cc/fsize.w)] or {}
             for y = 1, fsize.fh do
-                fdata[(c-1)/fsize.w][y] = {}
+                fdata[math.ceil(cc/fsize.w)][y] = fdata[math.ceil(cc/fsize.w)][y] or {}
                 for x = 0, fsize.w-1 do
-                    local r,g,b,a = i2:get(c%i2.width+x, y+math.floor(c/i2.width)*fsize.fh)
+                    local r,g,b,a = i2:get((cc)%i2.width+x, y+math.floor(cc/i2.width)*fsize.fh)
                     --s = s .. a
-                    fdata[(c-1)/fsize.w][y][x] = a>0 and 1 or 0
+                    --ch[y][x+1] = a>0 and 1 or 0
+                    --if (a>0 and 1 or 0) > 0 then
+                    fdata[math.ceil(cc/fsize.w)][y][x+1] = (a>0 and 1 or 0)
+                    --end
                 end
             end
+        else
+            local c = math.ceil(cc / fsize.w)
+            fdata[c] = {}
+            for block = 0, 5 do
+                fdata[c][block*3+1] = {}
+                if block < 5 then
+                    fdata[c][block*3+2] = {}
+                    fdata[c][block*3+3] = {}
+                end
+                local r, g, b, a = ci:get(c, block+1)
+                for x = 0, fsize.w-1 do
+                    fdata[c][block*3+1][x+1] = (r >> x) & 1
+                    if block < 5 then
+                        fdata[c][block*3+2][x+1] = (g >> x) & 1
+                        fdata[c][block*3+3][x+1] = (b >> x) & 1
+                    end
+                end
+            end
+            --]=]
         end
-        print("Scanned")
     end
-    setChar(readProjectData("CurrentChar") or ("A"):byte())
-    spriteMode(CORNER)
+    cc = cc + fsize.w * speed
+    --print(cc)
+    if cc > cm then
+        if not _ISCHECKING then
+            setChar(readProjectData("CurrentChar") or ("A"):byte())
+            draw = _draw
+            touched = _touched
+            --alert(#conflicts .. " conflicts found")
+            stopRecording()
+        else
+            cc = 1
+            _ISCHECKING = true
+        end
+    end
 end
 
 -- This function gets called once every frame
-function draw()
+function _draw()
     -- This sets a dark background color 
     background(255, 255, 255, 255)
+    noSmooth()
 
     -- This sets the line thickness
     strokeWidth(1)
@@ -72,9 +184,13 @@ function draw()
 
     -- Do your drawing here
     drawUI()
+    
+    --sprite(FONTPIX, -SCROLL,0)
+    --cfont:draw()
 end
 
-function touched(touch)
+function _touched(touch)
+    SCROLL = SCROLL + touch.deltaX
     if touch.state < ENDED then ctended = false end
     if touch.state == BEGAN then
         if range(touch.x, WIDTH-150,WIDTH-100,touch.y,HEIGHT-200,HEIGHT-100) and fpos > 255 then
@@ -96,8 +212,11 @@ function touched(touch)
             end
         elseif touch.x > WIDTH - 100 then
             local time = socket.gettime()
+            --[[
             local i = image((255) * fsize.w*.5, (fsize.h+fsize.desc)*.5*TYPES)
             setContext(i)
+            --background(255, 255, 255, 255)
+            --setContext()
             noStroke()
             noSmooth()
             fill(0)
@@ -105,33 +224,45 @@ function touched(touch)
                 for y, row in ipairs(char) do
                     for x, col in ipairs(row) do
                         if col == 1 then
-                            rect(((c*fsize.w+x)%(255*fsize.w))*.5, ((y-1)+(math.floor(c/255)*fsize.fh))*.5, .5, .5)
+                            --print(c*fsize.w + x, y)
+                            --i:set(c*fsize.w + x, y, color(255))
+                            rect(((c*fsize.w+x)%(255*fsize.w))*.5-.5, ((y-1)+(math.floor(c/255)*fsize.fh))*.5, .5, .5)
+                            --rect(((c*fsize.w+x)%(255*fsize.w))*.5, (y)*.5+math.floor((c*fsize.w+x)/(255*fsize.w)+0), .5, .5)
                         end
                     end
                 end
             end
-            saveImage("Documents:RASTER_FONT", i)
+            saveImage("Documents:FDATA_MODES_TESTING", i)
             print("Saved ("..(socket.gettime() - time)..")")
+            --]]
             time = socket.gettime()
-            local ci = image(255*TYPES-fsize.w, fsize.fh/4)
-            
-            local format = {"r", "g", "b", "a"}
-            local bl = {}
-            for c = 1, 255*TYPES-fsize.w do
-                for block = 0, 3 do
-                    local col = color(0,0)
-                    for y = 1, 4 do
-                        for x = 0, fsize.w-1 do
-                            if fdata[c] and fdata[c][block*4+y] then
-                                col[format[y]] = col[format[y]] + fdata[c][block*4+y][x] * (2^x)
-                            end
+            saveImage(fComp, compressFont())
+            print("Compressed ("..(socket.gettime() - time)..")")
+            --[[
+            local i = image((255) * fsize.w*.5, (fsize.h+fsize.desc)*.5*TYPES)
+            setContext(i)
+            --background(255, 255, 255, 255)
+            --setContext()
+            noStroke()
+            noSmooth()
+            fill(0)
+            for c, char in pairs(fdata) do
+                for y, row in ipairs(char) do
+                    for x, col in ipairs(row) do
+                        if col == 1 then
+                            --print(c*fsize.w + x, y)
+                            --i:set(c*fsize.w + x, y, color(255))
+                            rect(((c*fsize.w+x)%(255*fsize.w))*.5-.5, ((y-1)+(math.floor(c/255)*fsize.fh))*.5, .5, .5)
+                            --rect(((c*fsize.w+x)%(255*fsize.w))*.5, (y)*.5+math.floor((c*fsize.w+x)/(255*fsize.w)+0), .5, .5)
                         end
                     end
-                    ci:set(c, block+1, col)
                 end
             end
-            saveImage("Documents:RASTER_FONT_COMPRESSED", ci) -- not functional yet
-            print("Compressed ("..(socket.gettime() - time)..")")
+            saveImage("Documents:FDATA_MODES", i)
+            print("Saved ("..(socket.gettime() - time)..")")
+            --]]
+            saveImage(fRaw, F_IM)
+            print("Saved")
         end
     end
 end
@@ -203,7 +334,7 @@ ansi[89] = [[Y]]
 ansi[90] = [[Z]]
 ansi[91] = [[[]]
 ansi[92] = [[\]]
-ansi[93] = "]"
+ansi[93] = [=[]]=]
 ansi[94] = [[^]]
 ansi[95] = [[_]]
 ansi[96] = [[`]]
@@ -390,8 +521,10 @@ function dataString(a)
     local s = "{\n"
     for i, v in pairs(a) do
         s = s .. " [" .. i .. "]={\n"
+        --setWidth(i)
         for ri, row in ipairs(v) do
             s = s .. "  [" .. ri .. "]={"
+            --local row = v[ri]
             for ci = 1, uiWidth do
                 s = s .. row[ci] .. ","
             end
@@ -414,7 +547,8 @@ end
 uiWidth = fsize.w
 pWidth = fsize.w
 
-function setWidth(c) -- unused
+function setWidth(c)
+    --uiWidth = 1
     for i, v in ipairs(fdata[c]) do
         local ii = 1
         while ii < math.max(#v, math.max(pWidth, uiWidth)+1) + 1 do
@@ -428,12 +562,16 @@ function setWidth(c) -- unused
 end
 
 function setChar(c)
+    --c = c % 255
     fpos = c
-    if not(fdata[c]) or #(fdata[c]) ~= fsize.fh then
+    if fdata[c] and #(fdata[c]) == fsize.fh then
+        --setWidth(c)
+    else
         fdata[c] = fdata[c] or {}
         for n = 1, fsize.fh do
             if not fdata[c][n] then fdata[c][n] = {0, 0} end
         end
+        --setWidth(c)
     end
     saveProjectData("CurrentChar", c)
     for y, r in ipairs(fdata[c]) do
@@ -453,6 +591,7 @@ function setChar(c)
     for y, r in ipairs(fdata[c]) do
         for x, col in ipairs(r) do
             local r,g,b,a=i:get(x, y)
+            --if a > 0 then print(a, x, y) end
             if a == 0 then fdata[c][y][x] = 0 end
         end
     end
@@ -480,20 +619,26 @@ function drawUI()
                     fill(150)
                 elseif not ctended then
                     fdata[fpos][y][x] = ((fdata[fpos][y][x] or 0) + 1) % 2
-                    if fdata[fpos][y][x] < 1 then
-                        pWidth = uiWidth
-                        uiWidth = 1
-                    end
-                    fill(80)
+                    setContext(F_IM)
+                    pushStyle()
+                    fill(0, fdata[fpos][y][x]*255)
+                    noSmooth()
+                    noStroke()
+                    blendMode(ONE, ZERO)
+                    rect(((fpos*fsize.w+x)%(255*fsize.w))*.5-.5, ((y-1)+(math.floor(fpos/255)*fsize.fh))*.5, .5, .5)
+                    setContext()
+                    --saveImage(fRaw, F_IM)
+                    popStyle()
+                    fill(0)
                     ctended = true
                 elseif c > 0 then
-                    fill(80)
+                    fill(0)
                 else
                     fill(255)
                 end
-                setWidth(fpos)
+                --setWidth(fpos)
             elseif c and c > 0 then
-                fill(80)
+                fill(0)
             else
                 fill(255)
             end
@@ -514,4 +659,125 @@ function drawUI()
     fill(0)
     text("Character: " .. (ansi[fpos%255] or string.char(fpos%255) or "") .. " (" .. fpos .. ")", gs, my + 5)
     sprite(i, mx + 10, my - fsize.fh)
+    
+    --[[
+    fontSize(fsize.fh/2)-- * gs)
+    scale(gs*2)
+    fill(128, 50)
+    text(string.char(fpos), 0.,.5)--gs, gs)
+    --]]
+    --[[
+    fontSize(fsize.fh * gs)
+    fill(128, 25)
+    text(string.char(fpos), gs*0, gs+23)
+    --]]
+end
+
+--# Render
+
+--# utf8
+--[[
+🯐
+]]
+--# Rose
+Rose = class()
+function Rose:init(a, b)
+    a = a or 100
+    b = b or 3
+    local rose = function(angle) 
+        return a * math.cos(b * angle) 
+    end
+    self.points = {}
+    for theta = 0, math.pi * 2, 0.04 do
+        local r = rose(theta)
+        local x, y = r * math.cos(theta), r * math.sin(theta)
+        table.insert(self.points, vec2(x, y))
+    end
+    self.factor = #self.points-1-80
+    self.colors = {color(255, 0, 0, 255),color(255, 118, 0, 255),
+    color(255, 230, 0, 255),color(73, 255, 0, 255),
+    color(0, 249, 255, 255),color(15, 0, 255, 255),
+    color(190, 0, 255, 255),color(255, 0, 172, 255)}
+    self.next = 3
+end
+function Rose:draw()
+    self:ccyc(true)
+    for i = 80, #self.points - 1 do
+        --[[
+        stroke(self:ccyc())
+        --[=[
+        --]]
+        stroke(0)
+        --stroke((i-80)/(#self.points-80)*255)
+        --]=]
+        strokeWidth(8-7*(i-80)/self.factor)
+        line(self.points[i].x, self.points[i].y, self.points[i + 1].x, self.points[i + 1].y)
+    end
+    local last = self.points[#self.points]
+    for i = #self.points, 2, -1 do
+        self.points[i] = self.points[i - 1]
+    end
+    self.points[1] = last
+end
+function Rose:ccyc(reset)
+    if reset then
+        self.num = 0
+        self.c2 = self.colors[2]
+        self.c1 = self.colors[1]
+        self.next = 3
+        self.gl = 0
+    else
+        self.num = self.num + 1/self.factor
+        if self.num*7>=1 then
+            self.c1 = self.c2
+            self.c2 = self.colors[self.next] or self.colors[1]
+            self.num = 0
+            self.next = self.next + 1 
+        end
+        return self.c2:mix(self.c1,self.num*7)
+    end
+end
+
+--# Compress
+function compressFont(testing)
+    local i = image(255*TYPES,6)
+    i.premultiplied = false
+    for c = 1, 255*TYPES - 2 do
+        local rows = {}
+        for y = 1, #fdata[c] do
+            rows[y] = {}
+            for x = 1, 8 do
+                rows[y][x] = fdata[c][y][x] > 0 and 1 or 0
+                --if not rows[y][x] then error(c .. "," .. x .. ',' .. y) end
+            end
+        end
+        for n = 1, 16, 3 do
+            --local r,g,b,a=0,0,0,0
+            local col = color(0,0,0)
+            for x = 1, 8 do
+                --if not rows[n] then print("No " .. n) elseif not rows[n][x] then print("No " .. n .. "," .. x) end
+                --[=[
+                if rows[n][x] == 1 then col.r = col.r + (1 << (x-1)) end
+                if rows[n][x+1] == 1 then col.g = col.g + (1 << (x-1)) end
+                if rows[n][x+2] == 1 then col.b = col.b + (1 << (x-1)) end
+                if rows[n][x+3] == 1 then col.a = col.a + (1 << (x-1)) end
+                --[[
+                --]=]
+                col.r = col.r | (rows[n][x]<<(x-1))
+                if n < 15 then
+                    col.g = col.g | (rows[n+1][x]<<(x-1))
+                    if n < 15 then
+                        col.b = col.b | (rows[n+2][x]<<(x-1))
+                    end
+                end
+                --col.a = col.a | (rows[n+3][x]<<(x-1))
+                --]]
+            end
+            i:set(c, math.ceil(n/3),
+            testing and color(c+n,c+n+1,c+n+2,c+n+3) or col
+            )
+        end
+    end
+    i.premultiplied = false
+    return i
 end
